@@ -10,3 +10,15 @@ readme = "README.md"
 repository = "https://github.com/0xhappyboy/evm-trader"
 
 [dependencies]
+ethers-contract = "2.0"
+alloy = { version = "0.1", features = ["full"] }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+thiserror = "1.0"
+ethers = "2.0.14"
+chrono = "0.4.42"
+ethers-providers = "2.0.14"
+ethaddr = "0.2.2"
+primitive-types = "0.14.0"

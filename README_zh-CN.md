@@ -2,7 +2,7 @@
     🤵 Evm Trader
 </h1>
 <h4 align="center">
-Implement most of the commonly used practical transaction-related functions of the EVM network, all EVM traders will need this.🤑
+实现EVM网络大部分常用的实用交易相关功能,所有EVM交易者都需要这个.🤑
 </h4>
 <p align="center">
   <a href="https://github.com/0xhappyboy/evm-trader/LICENSE"><img src="https://img.shields.io/badge/License-GPL3.0-d1d1f6.svg?style=flat&labelColor=1C2C2E&color=BEC5C9&logo=googledocs&label=license&logoColor=BEC5C9" alt="License"></a>
