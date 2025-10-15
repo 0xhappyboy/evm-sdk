@@ -1992,8 +1992,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm-trader"
-version = "0.1.1"
+name = "evm-sdk"
+version = "0.1.2"
 dependencies = [
  "alloy",
  "chrono",
