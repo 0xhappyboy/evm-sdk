@@ -1,39 +1,5 @@
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EvmType {
-    Ethereum,
-    Arb,
-    Bsc,
-    Base,
-    HyperEVM,
-    Plasma,
-}
-
-impl EvmType {
-    pub fn name(&self) -> &'static str {
-        match self {
-            EvmType::Ethereum => "Ethereum",
-            EvmType::Arb => "Arbitrum",
-            EvmType::Bsc => "Binance Smart Chain",
-            EvmType::Base => "Base",
-            EvmType::HyperEVM => "HyperEVM",
-            EvmType::Plasma => "Plasma",
-        }
-    }
-
-    pub fn chain_id(&self) -> u64 {
-        match self {
-            EvmType::Ethereum => 1,
-            EvmType::Arb => 42161,
-            EvmType::Bsc => 56,
-            EvmType::Base => 8453,
-            EvmType::HyperEVM => 777,
-            EvmType::Plasma => 94,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum EvmError {
     ConfigError(String),
@@ -44,6 +10,12 @@ pub enum EvmError {
     ContractError(String),
     InvalidInput(String),
     IOError(String),
+    AaveError(String),
+    ListenerError(String),
+    ProviderError(String),
+    CalculationError(String),
+    MempoolError(String),
+    Error(String),
 }
 
 impl fmt::Display for EvmError {
@@ -57,18 +29,14 @@ impl fmt::Display for EvmError {
             EvmError::ContractError(msg) => write!(f, "Contract error: {}", msg),
             EvmError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
             EvmError::IOError(msg) => write!(f, "IO Error: {}", msg),
+            EvmError::AaveError(msg) => write!(f, "Aave Error: {}", msg),
+            EvmError::ListenerError(msg) => write!(f, "Aave Error: {}", msg),
+            EvmError::ProviderError(msg) => write!(f, "Aave Error: {}", msg),
+            EvmError::CalculationError(msg) => write!(f, "Aave Error: {}", msg),
+            EvmError::MempoolError(msg) => write!(f, "Aave Error: {}", msg),
+            EvmError::Error(msg) => write!(f, "Aave Error: {}", msg),
         }
     }
 }
 
 impl std::error::Error for EvmError {}
-
-/// Price data structure
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TokenPrice {
-    pub symbol: String,
-    pub price: f64,
-    pub change_24h: f64,
-    pub market_cap: f64,
-    pub volume_24h: f64,
-}
