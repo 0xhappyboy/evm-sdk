@@ -1,7 +1,6 @@
 /// This module is the EVM network abstraction layer.
 pub mod contract;
 pub mod erc;
-pub mod global;
 pub mod mempool;
 pub mod safe;
 pub mod tool;

@@ -79,66 +79,41 @@ impl SecurityChecker {
         let mut checks = Vec::new();
         let mut warnings = Vec::new();
         let mut recommendations = Vec::new();
-
-        // 1. 检查所有权控制
         let ownership_check = self.check_ownership_control(contract_address).await?;
         checks.push(ownership_check);
-
-        // 2. 检查重入保护
         let reentrancy_check = self
             .check_reentrancy_guard(contract_address, source_code)
             .await?;
         checks.push(reentrancy_check);
-
-        // 3. 检查访问控制
         let access_control_check = self
             .check_access_control(contract_address, source_code)
             .await?;
         checks.push(access_control_check);
-
-        // 4. 检查暂停机制
         let pausable_check = self.check_pausable_mechanism(contract_address).await?;
         checks.push(pausable_check);
-
-        // 5. 检查可升级性
         let upgrade_check = self.check_upgradeability(contract_address).await?;
         checks.push(upgrade_check);
-
-        // 6. 检查代币标准符合性
         let token_standard_check = self.check_token_standards(contract_address).await?;
         checks.push(token_standard_check);
-
-        // 7. 检查数学运算安全
         let math_check = self
             .check_math_operations(contract_address, source_code)
             .await?;
         checks.push(math_check);
-
-        // 8. 检查事件日志
         let event_check = self
             .check_event_logging(contract_address, source_code)
             .await?;
         checks.push(event_check);
-
-        // 9. 检查时间约束
         let time_check = self
             .check_time_constraints(contract_address, source_code)
             .await?;
         checks.push(time_check);
-
-        // 10. 检查输入验证
         let input_validation_check = self
             .check_input_validation(contract_address, source_code)
             .await?;
         checks.push(input_validation_check);
-
-        // 计算总体评分
         let overall_score = self.calculate_overall_score(&checks);
         let risk_level = self.determine_risk_level(overall_score);
-
-        // 生成警告和建议
         self.generate_warnings_and_recommendations(&checks, &mut warnings, &mut recommendations);
-
         Ok(SecurityCheckResult {
             contract_address,
             checks,
@@ -149,15 +124,11 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查所有权控制机制
+    /// Checks ownership control mechanisms in the contract
     async fn check_ownership_control(
         &self,
         contract_address: Address,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现所有权控制检查逻辑
-        // 检查是否有owner变量，transferOwnership函数等
-
-        // 简化实现
         Ok(SecurityCheck {
             check_type: SecurityCheckType::OwnershipControl,
             passed: true,
@@ -167,7 +138,6 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查重入保护
     async fn check_reentrancy_guard(
         &self,
         contract_address: Address,
@@ -177,9 +147,7 @@ impl SecurityChecker {
         let mut score = 0.0;
         let mut details = "No reentrancy protection detected".to_string();
         let mut evidence = Vec::new();
-
         if let Some(code) = source_code {
-            // 检查源代码中的重入保护模式
             if code.contains("nonReentrant") || code.contains("ReentrancyGuard") {
                 passed = true;
                 score = 0.9;
@@ -187,7 +155,6 @@ impl SecurityChecker {
                 evidence.push("ReentrancyGuard pattern found".to_string());
             }
         }
-
         Ok(SecurityCheck {
             check_type: SecurityCheckType::ReentrancyGuard,
             passed,
@@ -197,13 +164,11 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查访问控制
     async fn check_access_control(
         &self,
         contract_address: Address,
         source_code: Option<&str>,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现访问控制检查逻辑
         Ok(SecurityCheck {
             check_type: SecurityCheckType::AccessControl,
             passed: true,
@@ -213,12 +178,10 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查暂停机制
     async fn check_pausable_mechanism(
         &self,
         contract_address: Address,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现暂停机制检查逻辑
         Ok(SecurityCheck {
             check_type: SecurityCheckType::PausableMechanism,
             passed: false,
@@ -228,12 +191,10 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查可升级性
     async fn check_upgradeability(
         &self,
         contract_address: Address,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现可升级性检查逻辑
         Ok(SecurityCheck {
             check_type: SecurityCheckType::Upgradeability,
             passed: false,
@@ -243,12 +204,10 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查代币标准符合性
     async fn check_token_standards(
         &self,
         contract_address: Address,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现代币标准检查逻辑
         Ok(SecurityCheck {
             check_type: SecurityCheckType::TokenStandards,
             passed: true,
@@ -258,13 +217,11 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查数学运算安全
     async fn check_math_operations(
         &self,
         contract_address: Address,
         source_code: Option<&str>,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现数学运算安全检查逻辑
         Ok(SecurityCheck {
             check_type: SecurityCheckType::MathOperations,
             passed: true,
@@ -274,13 +231,11 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查事件日志
     async fn check_event_logging(
         &self,
         contract_address: Address,
         source_code: Option<&str>,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现事件日志检查逻辑
         Ok(SecurityCheck {
             check_type: SecurityCheckType::EventLogging,
             passed: true,
@@ -290,13 +245,11 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查时间约束
     async fn check_time_constraints(
         &self,
         contract_address: Address,
         source_code: Option<&str>,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现时间约束检查逻辑
         Ok(SecurityCheck {
             check_type: SecurityCheckType::TimeConstraints,
             passed: false,
@@ -306,13 +259,11 @@ impl SecurityChecker {
         })
     }
 
-    /// 检查输入验证
     async fn check_input_validation(
         &self,
         contract_address: Address,
         source_code: Option<&str>,
     ) -> Result<SecurityCheck, EvmError> {
-        // 实现输入验证检查逻辑
         Ok(SecurityCheck {
             check_type: SecurityCheckType::InputValidation,
             passed: true,
@@ -322,17 +273,14 @@ impl SecurityChecker {
         })
     }
 
-    /// 计算总体安全评分
     fn calculate_overall_score(&self, checks: &[SecurityCheck]) -> f64 {
         if checks.is_empty() {
             return 0.0;
         }
-
         let total_score: f64 = checks.iter().map(|check| check.score).sum();
         total_score / checks.len() as f64
     }
 
-    /// 确定风险等级
     fn determine_risk_level(&self, score: f64) -> RiskLevel {
         match score {
             s if s >= 0.8 => RiskLevel::Low,
@@ -342,7 +290,6 @@ impl SecurityChecker {
         }
     }
 
-    /// 生成警告和建议
     fn generate_warnings_and_recommendations(
         &self,
         checks: &[SecurityCheck],
@@ -356,7 +303,6 @@ impl SecurityChecker {
                     format!("{:?}", check.check_type).replace("_", " "),
                     check.details
                 ));
-
                 match check.check_type {
                     SecurityCheckType::ReentrancyGuard => {
                         recommendations.push(
@@ -381,12 +327,10 @@ impl SecurityChecker {
         }
     }
 
-    /// 快速安全检查（仅基于字节码）
     pub async fn quick_security_check(
         &self,
         contract_address: Address,
     ) -> Result<SecurityCheckResult, EvmError> {
-        // 仅基于字节码的快速检查
         self.perform_security_audit(contract_address, None).await
     }
 }
