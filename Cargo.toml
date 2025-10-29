@@ -14,7 +14,7 @@ tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 hex = "0.4"
-chrono = "0.4.42"
-primitive-types = "0.14.0"
+chrono = "0.4.42" 
 ethers = { version = "2.0", features = ["ws", "openssl"] }
 csv = "1.4.0"
+evm-client = "0.1.5"
