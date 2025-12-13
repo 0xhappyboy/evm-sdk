@@ -22,7 +22,7 @@ cargo add evm-sdk
 ## 基础用法
 
 ```rust
-use evm_utils::{Evm, EvmType};
+use evm_client::{Evm, EvmType};
 use ethers::types::Address;
 
 #[tokio::main]
@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let balance = evm.get_balance(address).await?;
     println!("Balance: {}", balance);
     // 分析合约
-    let analyzer = evm_utils::contract::ContractAnalyzer::new(Arc::new(evm));
+    let analyzer = evm_client::contract::ContractAnalyzer::new(Arc::new(evm));
     let contract_info = analyzer.get_contract_info(address).await?;
     println!("Contract bytecode length: {}", contract_info.bytecode.len());
     Ok(())
@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## 监控大额交易
 
 ```rust
-use evm_utils::{Evm, EvmType, TradeEventListener};
+use evm_client::{Evm, EvmType, TradeEventListener};
 use std::sync::Arc;
 
 #[tokio::main]
