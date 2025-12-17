@@ -1,27 +1,34 @@
+pub mod block;
 /// This module is the EVM network abstraction layer.
 pub mod contract;
 pub mod erc;
+pub mod global;
 pub mod mempool;
 pub mod safe;
 pub mod tool;
 pub mod trade;
 pub mod types;
-pub mod global;
 
 use std::sync::Arc;
 
+use crate::block::BlockService;
 use crate::mempool::MempoolListener;
 use crate::mempool::MempoolService;
 use crate::trade::Trade;
 use crate::trade::TradeEventListener;
 use crate::types::EvmError;
 use ethers::providers::Middleware;
+use ethers::providers::StreamExt;
+use ethers::types::Block;
+use ethers::types::BlockNumber;
 use ethers::{
     signers::Signer,
     types::{Address, H256, TransactionRequest, U256},
 };
 use evm_client::EvmClient;
 use evm_client::EvmType;
+
+use ethers::types::Transaction;
 
 /// EVM Client for interacting with various EVM chains
 #[derive(Clone)]
@@ -30,6 +37,58 @@ pub struct Evm {
 }
 
 impl Evm {
+    /// Get block by number (height) - returns block with transaction hashes
+    pub async fn get_block_by_number(
+        &self,
+        block_number: BlockNumber,
+    ) -> Result<Option<Block<H256>>, EvmError> {
+        self.client
+            .provider
+            .get_block(block_number)
+            .await
+            .map_err(|e| EvmError::RpcError(format!("Failed to get block: {}", e)))
+    }
+
+    /// Get block by hash - returns block with transaction hashes
+    pub async fn get_block_by_hash(
+        &self,
+        block_hash: H256,
+    ) -> Result<Option<Block<H256>>, EvmError> {
+        self.client
+            .provider
+            .get_block(block_hash)
+            .await
+            .map_err(|e| EvmError::RpcError(format!("Failed to get block: {}", e)))
+    }
+
+    /// Get block with full transaction details
+    pub async fn get_block_with_txs(
+        &self,
+        block_number: BlockNumber,
+    ) -> Result<Option<Block<Transaction>>, EvmError> {
+        self.client
+            .provider
+            .get_block_with_txs(block_number)
+            .await
+            .map_err(|e| EvmError::RpcError(format!("Failed to get block with txs: {}", e)))
+    }
+
+    /// Get block with full transaction details by hash
+    pub async fn get_block_with_txs_by_hash(
+        &self,
+        block_hash: H256,
+    ) -> Result<Option<Block<Transaction>>, EvmError> {
+        let block = self.get_block_by_hash(block_hash).await?;
+        if let Some(ref block_info) = block {
+            if let Some(block_number) = block_info.number {
+                return self
+                    .get_block_with_txs(BlockNumber::Number(block_number))
+                    .await;
+            }
+        }
+        Ok(None)
+    }
+
     /// Create a new EVM client without wallet
     ///
     /// # Example
@@ -353,5 +412,68 @@ impl Evm {
     /// ```
     pub fn get_mempool_listener(self: Arc<Self>) -> MempoolListener {
         MempoolListener::new(self.clone())
+    }
+
+    /// Get block service for block-related operations
+    ///
+    /// # Example
+    /// ```
+    /// use std::sync::Arc;
+    ///
+    /// async fn example(evm: Evm) -> Result<(), Box<dyn std::error::Error>> {
+    ///     let evm_arc = Arc::new(evm);
+    ///     let block_service = evm_arc.clone().get_block_service();
+    ///     
+    ///     let latest_block = block_service.get_latest_block().await?;
+    ///     if let Some(block) = latest_block {
+    ///         println!("Latest block: #{}", block.number.unwrap_or_default());
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn get_block_service(self: Arc<Self>) -> BlockService {
+        BlockService::new(self.clone())
+    }
+    
+    /// Listen to the latest block (listen to newly generated blocks in real time)
+    ///
+    /// # Example
+    /// ```
+    /// let mut block_receiver = trade_service.listen_latest_blocks().await?;
+    ///
+    /// while let Some(block) = block_receiver.recv().await {
+    ///     println!("New block: #{}", block.number.unwrap_or_default());
+    /// }
+    /// ```
+    pub async fn listen_latest_blocks(
+        &self,
+    ) -> Result<tokio::sync::broadcast::Receiver<ethers::types::Block<ethers::types::H256>>, EvmError>
+    {
+        use ethers::providers::Middleware;
+        use tokio::sync::broadcast;
+        let (sender, receiver) = broadcast::channel(1024);
+        let provider = self.client.provider.clone();
+        tokio::spawn(async move {
+            if let Ok(mut stream) = provider.watch_blocks().await {
+                while let Some(block_hash) = stream.next().await {
+                    match provider.get_block(block_hash).await {
+                        Ok(Some(block)) => {
+                            if sender.send(block).is_err() {
+                                break;
+                            }
+                        }
+                        Ok(None) => {
+                            log::warn!("Block not found for hash: {:?}", block_hash);
+                        }
+                        Err(e) => {
+                            log::error!("Failed to get block: {:?}", e);
+                        }
+                    }
+                }
+            } else {
+                log::error!("Failed to create block watcher stream");
+            }
+        });
+        Ok(receiver)
     }
 }

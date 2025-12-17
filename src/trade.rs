@@ -516,6 +516,34 @@ impl Trade {
         }
         Ok(snapshots)
     }
+
+    /// Listen for the latest transactions of the pool contract
+    ///
+    /// # Params
+    /// - `pool_address`: Pool Address
+    /// - `min_value`: Minimum transaction amount threshold
+    ///
+    /// # Example
+    /// ```
+    /// let mut receiver = trade_service.watch_pool_transactions(
+    ///     "0x...".to_string(),
+    ///     U256::from(1000 * 10u64.pow(18)) // 1000 ETH/tokens
+    /// ).await?;
+    ///
+    /// while let Some(tx) = receiver.recv().await {
+    ///     println!("Pool transaction: {:?}", tx.transaction.hash);
+    /// }
+    /// ```
+    pub async fn watch_pool_transactions(
+        &self,
+        pool_address: String,
+        min_value: ethers::types::U256,
+    ) -> Result<tokio::sync::mpsc::Receiver<TransactionWithReceipt>, EvmError> {
+        let event_listener = TradeEventListener::new(self.evm.clone());
+        event_listener
+            .watch_pool_transactions(pool_address, min_value, 3)
+            .await
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -608,6 +636,111 @@ pub struct TradeEventListener {
 impl TradeEventListener {
     pub fn new(evm: Arc<Evm>) -> Self {
         Self { evm: evm }
+    }
+
+    pub async fn watch_pool_transactions(
+        &self,
+        pool_address: String,
+        min_value: ethers::types::U256,
+        poll_interval_secs: u64,
+    ) -> Result<tokio::sync::mpsc::Receiver<TransactionWithReceipt>, EvmError> {
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        let evm = self.evm.clone();
+        let last_block = Arc::new(AtomicU64::new(0));
+        let current_block = evm
+            .client
+            .provider
+            .get_block_number()
+            .await
+            .map_err(|e| EvmError::RpcError(format!("Failed to get current block: {}", e)))?;
+        last_block.store(current_block.as_u64(), Ordering::SeqCst);
+        let pool_address_parsed: Address = pool_address
+            .parse()
+            .map_err(|e| EvmError::RpcError(format!("Invalid pool address format: {}", e)))?;
+        tokio::spawn(async move {
+            let mut poll_interval = interval(Duration::from_secs(poll_interval_secs));
+            loop {
+                poll_interval.tick().await;
+                if let Err(e) = Self::poll_pool_transactions(
+                    &evm,
+                    &last_block,
+                    pool_address_parsed,
+                    min_value,
+                    &tx,
+                )
+                .await
+                {
+                    error!(target: "[Trade Module]", "Error polling pool transactions: {:?}", e);
+                    tokio::time::sleep(Duration::from_secs(poll_interval_secs * 2)).await;
+                }
+            }
+        });
+        Ok(rx)
+    }
+
+    async fn poll_pool_transactions(
+        evm: &Evm,
+        last_block: &AtomicU64,
+        pool_address: Address,
+        min_value: ethers::types::U256,
+        tx: &tokio::sync::mpsc::Sender<TransactionWithReceipt>,
+    ) -> Result<(), EvmError> {
+        let current_block = evm
+            .client
+            .provider
+            .get_block_number()
+            .await
+            .map_err(|e| EvmError::RpcError(format!("Failed to get current block: {}", e)))?;
+        let current_block_num = current_block.as_u64();
+        let from_block = last_block.load(Ordering::SeqCst) + 1;
+
+        if from_block > current_block_num {
+            return Ok(());
+        }
+
+        let to_block = if current_block_num - from_block > 1000 {
+            from_block + 1000
+        } else {
+            current_block_num
+        };
+        let filter = Filter::new()
+            .address(pool_address)
+            .topic0(H256::from(ethers::utils::keccak256(
+                b"Swap(address,uint256,uint256,uint256,uint256,address)",
+            )))
+            .from_block(BlockNumber::Number(from_block.into()))
+            .to_block(BlockNumber::Number(to_block.into()));
+        let logs = evm
+            .client
+            .provider
+            .get_logs(&filter)
+            .await
+            .map_err(|e| EvmError::RpcError(format!("Failed to get pool logs: {}", e)))?;
+        for log in logs {
+            if let Some(tx_hash) = log.transaction_hash {
+                if let Ok(Some(transaction)) = evm.client.provider.get_transaction(tx_hash).await {
+                    if transaction.value >= min_value {
+                        let receipt = evm
+                            .client
+                            .provider
+                            .get_transaction_receipt(tx_hash)
+                            .await
+                            .map_err(|e| {
+                                EvmError::RpcError(format!("Failed to get receipt: {}", e))
+                            })?;
+                        let tx_with_receipt = TransactionWithReceipt {
+                            transaction,
+                            receipt,
+                        };
+                        if tx.send(tx_with_receipt).await.is_err() {
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+        last_block.store(to_block, Ordering::SeqCst);
+        Ok(())
     }
 
     /// Watch for large transactions based on value threshold
@@ -1266,6 +1399,8 @@ impl TransactionInfo {
 
 #[cfg(test)]
 mod test {
+    use evm_client::EvmType;
+
     use crate::{Evm, trade::Trade};
     use std::sync::Arc;
 
@@ -1287,5 +1422,21 @@ mod test {
         let spent = t.get_spent_token_eth();
         println!("Actual Received {:?}", received);
         println!("Actual Spent {:?}", spent);
+    }
+
+    #[tokio::test]
+    async fn test_watch_pool_transactions() {
+        let evm = Evm::new(EvmType::BASE_MAINNET).await.unwrap();
+        let trade = Trade::new(Arc::new(evm));
+        let mut receiver = trade
+            .watch_pool_transactions(
+                "0xef0A856B572108eF0ad9DAC10580811939Ca3BB7".to_string(),
+                ethers::types::U256::from(1000),
+            )
+            .await
+            .unwrap();
+        while let Some(tx) = receiver.recv().await {
+            println!("Pool transaction: {:?}", tx.transaction.hash);
+        }
     }
 }
