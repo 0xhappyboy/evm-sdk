@@ -39,6 +39,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```
 
+## Get the actual number and amount of tokens decreased and increased in a specified transaction.
+
+```rust
+#[cfg(test)]
+mod test {
+    use crate::{Evm, trade::Trade};
+    use std::sync::Arc;
+    #[tokio::test]
+    async fn test_get_transaction_by_tx() {
+        let evm = Evm::new(evm_client::EvmType::ETHEREUM_MAINNET)
+            .await
+            .unwrap();
+        let trade = Trade::new(Arc::new(evm));
+        let t = trade
+            .get_transactions_by_tx(
+                "0x2c632c004c7a2c5daedf54f53a7ab424756b383bfc477bfc802e3a1d5a930a2e",
+            )
+            .await
+            .unwrap();
+        // reality received
+        let received = t.get_received_token_eth();
+        // reality spent
+        let spent = t.get_spent_token_eth();
+        println!("Actual Received {:?}", received);
+        println!("Actual Spent {:?}", spent);
+    }
+}
+```
+
 ## Monitoring large transactions
 
 ```rust
