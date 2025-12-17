@@ -6,13 +6,14 @@ pub mod safe;
 pub mod tool;
 pub mod trade;
 pub mod types;
+pub mod global;
 
 use std::sync::Arc;
 
 use crate::mempool::MempoolListener;
 use crate::mempool::MempoolService;
+use crate::trade::Trade;
 use crate::trade::TradeEventListener;
-use crate::trade::TradeService;
 use crate::types::EvmError;
 use ethers::providers::Middleware;
 use ethers::{
@@ -302,8 +303,8 @@ impl Evm {
     /// Ok(())
     /// }
     /// ```
-    pub fn get_trade_service(self: Arc<Self>) -> TradeService {
-        TradeService::new(self.clone())
+    pub fn get_trade_service(self: Arc<Self>) -> Trade {
+        Trade::new(self.clone())
     }
 
     /// Get trade event listener for monitoring trade events

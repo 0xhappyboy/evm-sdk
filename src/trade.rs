@@ -1,4 +1,4 @@
-use crate::{Evm, EvmError, trade};
+use crate::{Evm, EvmError, erc::erc20::ERC20Service, global::is_quote, types::Direction};
 use ethers::{
     providers::Middleware,
     types::{
@@ -6,6 +6,7 @@ use ethers::{
         ValueOrArray,
     },
 };
+use log::error;
 use serde::{Deserialize, Serialize};
 use std::{
     sync::{
@@ -18,7 +19,7 @@ use tokio::time::interval;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionQuery {
-    pub address: String, 
+    pub address: String,
     pub from_block: Option<u64>,
     pub to_block: Option<u64>,
     pub page: Option<u64>,
@@ -43,11 +44,15 @@ pub struct PaginatedTransactions {
 /// Service for handling transaction-related operations
 pub struct Trade {
     evm: Arc<Evm>,
+    erc20_service: ERC20Service,
 }
 
 impl Trade {
     pub fn new(evm: Arc<Evm>) -> Self {
-        Self { evm: evm }
+        Self {
+            evm: evm.clone(),
+            erc20_service: ERC20Service::new(evm.clone()),
+        }
     }
 
     /// Retrieve transaction details based on transaction hash
@@ -121,6 +126,18 @@ impl Trade {
         let max_fee_per_gas = transaction.max_fee_per_gas;
         let transaction_type = transaction.transaction_type.map(|t| t.as_u64());
         let chain_id = transaction.chain_id;
+        let mut token_decimals_cache = std::collections::HashMap::new();
+        for log in &logs {
+            let token_address = log.address;
+            match self.erc20_service.get_decimals(token_address).await {
+                Ok(decimals) => {
+                    token_decimals_cache.insert(token_address, decimals);
+                }
+                Err(e) => {
+                    token_decimals_cache.insert(token_address, 18);
+                }
+            }
+        }
         Ok(TransactionInfo {
             hash,
             from: transaction.from,
@@ -146,6 +163,7 @@ impl Trade {
             logs,
             is_success,
             total_gas_cost,
+            token_decimals_cache,
         })
     }
 
@@ -481,7 +499,6 @@ impl Trade {
         let address_parsed: Address = address
             .parse()
             .map_err(|e| EvmError::RpcError(format!("Invalid address format: {}", e)))?;
-
         let mut snapshots = Vec::new();
         for block_number in (from_block..=to_block).step_by(interval as usize) {
             let balance = self
@@ -628,7 +645,6 @@ impl TradeEventListener {
                 if let Err(e) =
                     Self::poll_large_transactions(&evm, &last_block, min_value, &tx).await
                 {
-                    eprintln!("Error polling large transactions: {}", e);
                     tokio::time::sleep(Duration::from_secs(poll_interval_secs * 2)).await;
                 }
             }
@@ -708,7 +724,6 @@ impl TradeEventListener {
             }
             None => None,
         };
-
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let evm = self.evm.clone();
         let last_block = Arc::new(AtomicU64::new(0));
@@ -732,7 +747,6 @@ impl TradeEventListener {
                 )
                 .await
                 {
-                    eprintln!("Error polling large transfers: {}", e);
                     tokio::time::sleep(Duration::from_secs(poll_interval_secs * 2)).await;
                 }
             }
@@ -798,7 +812,7 @@ impl TradeEventListener {
                     }
                 }
                 Err(e) => {
-                    eprintln!("Failed to parse transfer event: {}", e);
+                    error!(target: "[Trade Module]", "Failed to parse transfer event: {:?}", e);
                 }
             }
         }
@@ -839,7 +853,6 @@ impl TradeEventListener {
         let address_parsed: Address = address
             .parse()
             .map_err(|e| EvmError::RpcError(format!("Invalid address format: {}", e)))?;
-
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let evm = self.evm.clone();
         let last_block = Arc::new(AtomicU64::new(0));
@@ -930,7 +943,7 @@ impl TradeEventListener {
                 if let Err(e) =
                     Self::poll_transfer_events(&evm, &last_block, address_parsed, &tx).await
                 {
-                    eprintln!("Error polling transfer events: {}", e);
+                    error!(target: "[Trade Module]", "Error polling transfer events: {:?}", e);
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }
@@ -980,7 +993,7 @@ impl TradeEventListener {
                     }
                 }
                 Err(e) => {
-                    eprintln!("Failed to parse transfer event: {}", e);
+                    error!(target: "[Trade Module]", "Failed to parse transfer event: {:?}", e);
                 }
             }
         }
@@ -998,7 +1011,6 @@ impl TradeEventListener {
         let address_parsed: Address = address
             .parse()
             .map_err(|e| EvmError::RpcError(format!("Invalid address format: {}", e)))?;
-
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let evm = self.evm.clone();
         let last_block = Arc::new(AtomicU64::new(0));
@@ -1022,7 +1034,7 @@ impl TradeEventListener {
                 )
                 .await
                 {
-                    eprintln!("Error polling events: {}", e);
+                    error!(target: "[Trade Module]", "Error polling events: {:?}", e);
                     tokio::time::sleep(Duration::from_secs(poll_interval_secs * 2)).await;
                 }
             }
@@ -1166,6 +1178,7 @@ pub struct TransactionInfo {
     pub logs: Vec<Log>,
     pub is_success: bool,
     pub total_gas_cost: Option<U256>,
+    pub token_decimals_cache: std::collections::HashMap<Address, u8>,
 }
 
 impl TransactionInfo {
@@ -1239,30 +1252,22 @@ impl TransactionInfo {
     }
 
     fn get_token_decimals(&self, token_address: &Address) -> u8 {
-        let common_tokens = [
-            ("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", 18), // WETH
-            ("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", 6),  // USDC
-            ("0xdac17f958d2ee523a2206206994597c13d831ec7", 6),  // USDT
-            ("0x2260fac5e5542a773aa44fbcfedf7c193bc2c599", 8),  // WBTC
-            ("0x6b175474e89094c44da98b954eedeac495271d0f", 18), // DAI
-        ];
-        let addr_str = format!("{:?}", token_address).to_lowercase();
-        for (addr, decimals) in &common_tokens {
-            if addr_str.contains(&addr[2..]) {
-                return *decimals;
-            }
+        *self.token_decimals_cache.get(token_address).unwrap_or(&18)
+    }
+
+    fn getDirection(&self) -> Direction {
+        if (is_quote(&format!("{:?}", &self.get_spent_token_eth().unwrap().0))) {
+            Direction::Buy
+        } else {
+            Direction::Sell
         }
-        18
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
-
-    use ethers::abi::Address;
-
     use crate::{Evm, trade::Trade};
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_get_transaction_by_tx() {
@@ -1272,7 +1277,7 @@ mod test {
         let trade = Trade::new(Arc::new(evm));
         let t = trade
             .get_transactions_by_tx(
-                "0x0383230a412bc2d98471e14de7c2ed06f53090c3b106519c839169c83a803b35",
+                "0x2c632c004c7a2c5daedf54f53a7ab424756b383bfc477bfc802e3a1d5a930a2e",
             )
             .await
             .unwrap();
@@ -1280,5 +1285,7 @@ mod test {
         let received = t.get_received_token_eth();
         // reality spent
         let spent = t.get_spent_token_eth();
+        println!("Actual Received {:?}", received);
+        println!("Actual Spent {:?}", spent);
     }
 }

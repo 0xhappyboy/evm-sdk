@@ -40,3 +40,9 @@ impl fmt::Display for EvmError {
 }
 
 impl std::error::Error for EvmError {}
+
+#[derive(Debug)]
+pub enum Direction {
+    Buy,
+    Sell,
+}

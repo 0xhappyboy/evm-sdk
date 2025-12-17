@@ -1,4 +1,4 @@
-use crate::{EvmClient, EvmError};
+use crate::{Evm, EvmClient, EvmError};
 use ethers::{
     contract::abigen,
     providers::Provider,
@@ -15,6 +15,9 @@ abigen!(
         function allowance(address owner, address spender) external view returns (uint256)
         function approve(address spender, uint256 amount) external returns (bool)
         function transferFrom(address from, address to, uint256 amount) external returns (bool)
+        function decimals() external view returns (uint8)  
+        function name() external view returns (string)    
+        function symbol() external view returns (string)   
         event Transfer(address indexed from, address indexed to, uint256 value)
         event Approval(address indexed owner, address indexed spender, uint256 value)
     ]"#
@@ -22,17 +25,17 @@ abigen!(
 
 /// ERC20 Service for interacting with ERC20 tokens
 pub struct ERC20Service {
-    client: Arc<EvmClient>,
+    evm: Arc<Evm>,
 }
 
 impl ERC20Service {
-    pub fn new(client: Arc<EvmClient>) -> Self {
-        Self { client }
+    pub fn new(evm: Arc<Evm>) -> Self {
+        Self { evm }
     }
 
     /// Create ERC20 token instance
     fn erc20(&self, token_address: Address) -> IERC20<Provider<ethers::providers::Http>> {
-        IERC20::new(token_address, self.client.provider.clone())
+        IERC20::new(token_address, self.evm.client.provider.clone())
     }
 
     /// Get ERC20 token balance
@@ -64,7 +67,7 @@ impl ERC20Service {
         to: Address,
         amount: U256,
     ) -> Result<H256, EvmError> {
-        if self.client.wallet.is_none() {
+        if self.evm.client.wallet.is_none() {
             return Err(EvmError::WalletError("No wallet configured".to_string()));
         }
         let erc20 = self.erc20(token_address);
@@ -98,7 +101,7 @@ impl ERC20Service {
         spender: Address,
         amount: U256,
     ) -> Result<H256, EvmError> {
-        if self.client.wallet.is_none() {
+        if self.evm.client.wallet.is_none() {
             return Err(EvmError::WalletError("No wallet configured".to_string()));
         }
         let erc20 = self.erc20(token_address);
@@ -118,7 +121,7 @@ impl ERC20Service {
         to: Address,
         amount: U256,
     ) -> Result<H256, EvmError> {
-        if self.client.wallet.is_none() {
+        if self.evm.client.wallet.is_none() {
             return Err(EvmError::WalletError("No wallet configured".to_string()));
         }
         let erc20 = self.erc20(token_address);
@@ -128,6 +131,16 @@ impl ERC20Service {
             .await
             .map_err(|e| EvmError::TransactionError(format!("Failed to transfer from: {}", e)))?;
         Ok(pending_tx.tx_hash())
+    }
+
+    /// Get ERC20 token decimals
+    pub async fn get_decimals(&self, token_address: Address) -> Result<u8, EvmError> {
+        let erc20 = self.erc20(token_address);
+        erc20
+            .decimals()
+            .call()
+            .await
+            .map_err(|e| EvmError::ContractError(format!("Failed to get ERC20 decimals: {}", e)))
     }
 }
 
