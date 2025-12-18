@@ -115,3 +115,62 @@ pub fn is_quote(address: &str) -> bool {
         || address_lower == USDC_AVALANCHE_MAINNET.to_lowercase()
         || address_lower == DAI_AVALANCHE_MAINNET.to_lowercase()
 }
+
+pub fn get_block_time_by_address(address: &str) -> Option<u64> {
+    let addr = address.to_lowercase();
+    if addr == ETH_ETHEREUM_MAINNET.to_lowercase()
+        || addr == USDT_ETHEREUM_MAINNET.to_lowercase()
+        || addr == USDC_ETHEREUM_MAINNET.to_lowercase()
+    {
+        return Some(12);
+    }
+    if addr == ETH_ARB_MAINNET.to_lowercase()
+        || addr == USDT_ARB_MAINNET.to_lowercase()
+        || addr == USDC_ARB_MAINNET.to_lowercase()
+    {
+        return Some(1);
+    }
+    if addr == BNB_BSC_MAINNET.to_lowercase()
+        || addr == USDT_BSC_MAINNET.to_lowercase()
+        || addr == USDC_BSC_MAINNET.to_lowercase()
+    {
+        return Some(3);
+    }
+    if addr == ETH_BASE_MAINNET.to_lowercase() || addr == USDC_BASE_MAINNET.to_lowercase() {
+        return Some(2);
+    }
+    if addr == HYPE_HYPEREVM_MAINNET.to_lowercase() || addr == ETH_HYPEREVM_MAINNET.to_lowercase() {
+        return Some(2);
+    }
+    if addr == WXPL_PLASMA_MAINNET.to_lowercase() {
+        return Some(2);
+    }
+    if addr == POL_POLYGON_MAINNET.to_lowercase()
+        || addr == USDT_POLYGON_MAINNET.to_lowercase()
+        || addr == USDC_POLYGON_MAINNET.to_lowercase()
+    {
+        return Some(2);
+    }
+    if addr == ETH_OPTIMISM_MAINNET.to_lowercase()
+        || addr == USDT_OPTIMISM_MAINNET.to_lowercase()
+        || addr == USDC_OPTIMISM_MAINNET.to_lowercase()
+    {
+        return Some(2);
+    }
+    if addr == ETH_ZKSYNC_MAINNET.to_lowercase() || addr == USDC_ZKSYNC_MAINNET.to_lowercase() {
+        return Some(2);
+    }
+    if addr == ETH_STARKNET_MAINNET.to_lowercase()
+        || addr == USDT_STARKNET_MAINNET.to_lowercase()
+        || addr == USDC_STARKNET_MAINNET.to_lowercase()
+    {
+        return Some(10);
+    }
+    if addr == WAVAX_AVALANCHE_MAINNET.to_lowercase()
+        || addr == USDT_AVALANCHE_MAINNET.to_lowercase()
+        || addr == USDC_AVALANCHE_MAINNET.to_lowercase()
+    {
+        return Some(2);
+    }
+    None
+}

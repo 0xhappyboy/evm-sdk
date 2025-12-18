@@ -1153,9 +1153,9 @@ dependencies = [
 
 [[package]]
 name = "evm-client"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e5d90e4a220f4811b882f58a1047483c44659d84690216acc43ee436a816b75"
+checksum = "31a66e0e27bff8512e22d8ff440725e4668b3e2e2925777662b4770a77da6322"
 dependencies = [
  "ethers",
 ]

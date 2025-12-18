@@ -1255,7 +1255,7 @@ impl TransactionInfo {
         *self.token_decimals_cache.get(token_address).unwrap_or(&18)
     }
 
-    fn getDirection(&self) -> Direction {
+    pub fn getDirection(&self) -> Direction {
         if (is_quote(&format!("{:?}", &self.get_spent_token_eth().unwrap().0))) {
             Direction::Buy
         } else {
