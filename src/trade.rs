@@ -1262,6 +1262,114 @@ impl TransactionInfo {
             Direction::Sell
         }
     }
+
+    /// get liquidity pool addresses
+    pub fn get_liquidity_pool_addresses(&self) -> Vec<Address> {
+        use crate::global::dex_events;
+        let mut pool_addresses = Vec::new();
+        let swap_sig = dex_events::uniswap_v2_swap();
+        let mint_sig = dex_events::uniswap_v2_mint();
+        let burn_sig = dex_events::uniswap_v2_burn();
+        let sync_sig = dex_events::uniswap_v2_sync();
+        let add_liquidity_sig = dex_events::curve_add_liquidity();
+        let remove_liquidity_sig = dex_events::curve_remove_liquidity();
+        for log in &self.logs {
+            if log.topics.is_empty() {
+                continue;
+            }
+            let topic0_bytes = log.topics[0].as_bytes();
+            if topic0_bytes[..] == swap_sig[..]
+                || topic0_bytes[..] == mint_sig[..]
+                || topic0_bytes[..] == burn_sig[..]
+                || topic0_bytes[..] == sync_sig[..]
+                || topic0_bytes[..] == add_liquidity_sig[..]
+                || topic0_bytes[..] == remove_liquidity_sig[..]
+            {
+                pool_addresses.push(log.address);
+            }
+            if log.topics.len() == 3 && log.data.len() >= 32 {
+                if self.logs.iter().any(|other_log| {
+                    other_log.address == log.address
+                        && !other_log.topics.is_empty()
+                        && other_log.topics[0].as_bytes()[..] == swap_sig[..]
+                }) {
+                    pool_addresses.push(log.address);
+                }
+            }
+        }
+        pool_addresses.sort();
+        pool_addresses.dedup();
+        pool_addresses
+    }
+
+    pub fn get_dex_names(&self) -> Vec<String> {
+        use crate::global::{dex_events, get_dex_name_by_address};
+        let mut exchange_names = Vec::new();
+        if let Some(to_address) = self.to {
+            let to_str = format!("{:?}", to_address);
+            if let Some(dex_name) = get_dex_name_by_address(&to_str) {
+                exchange_names.push(dex_name.to_string());
+            }
+        }
+        let from_str = format!("{:?}", self.from);
+        if let Some(dex_name) = get_dex_name_by_address(&from_str) {
+            let name = dex_name.to_string();
+            if !exchange_names.contains(&name) {
+                exchange_names.push(name);
+            }
+        }
+        let mut dex_identified_by_events = Vec::new();
+        for log in &self.logs {
+            if log.topics.is_empty() {
+                continue;
+            }
+            let topic0_bytes = log.topics[0].as_bytes();
+            if let Some(dex_name) = dex_events::identify_dex_by_event(topic0_bytes) {
+                if !dex_identified_by_events.contains(&dex_name.to_string()) {
+                    dex_identified_by_events.push(dex_name.to_string());
+                }
+            }
+            let log_addr_str = format!("{:?}", log.address);
+            if let Some(dex_name) = get_dex_name_by_address(&log_addr_str) {
+                let name = dex_name.to_string();
+                if !exchange_names.contains(&name) {
+                    exchange_names.push(name);
+                }
+            }
+        }
+        for dex_name in dex_identified_by_events {
+            if !exchange_names.contains(&dex_name) {
+                exchange_names.push(dex_name);
+            }
+        }
+        if exchange_names.is_empty() {
+            let pool_addresses = self.get_liquidity_pool_addresses();
+            if !pool_addresses.is_empty() {
+                exchange_names.push("Decentralized Exchange".to_string());
+            }
+        }
+        if !self.input.is_empty() && self.input.len() >= 4 {
+            let selector = &self.input[0..4];
+            let dex_selectors: Vec<([u8; 4], &str)> = vec![
+                ([0x38, 0xed, 0x17, 0x38], "Uniswap V2"), // swapExactTokensForTokens
+                ([0x88, 0x03, 0xdb, 0xee], "Uniswap V2"), // swapTokensForExactTokens
+                ([0x02, 0x1b, 0x21, 0xfc], "SushiSwap"),  // swapExactTokensForTokens (Sushi)
+                ([0x59, 0x1c, 0x58, 0xdf], "Curve"),      // exchange
+                ([0x09, 0x5e, 0xa7, 0xb3], "1inch"),      // swap
+            ];
+            for (func_selector, dex_name) in dex_selectors {
+                if selector == func_selector {
+                    if !exchange_names.contains(&dex_name.to_string()) {
+                        exchange_names.push(dex_name.to_string());
+                    }
+                    break;
+                }
+            }
+        }
+        exchange_names.sort();
+        exchange_names.dedup();
+        exchange_names
+    }
 }
 
 #[cfg(test)]
@@ -1289,5 +1397,10 @@ mod test {
         let spent = t.get_spent_token_eth();
         println!("Actual Received {:?}", received);
         println!("Actual Spent {:?}", spent);
+        println!(
+            "Liquidity Pool Address:{:?}",
+            t.get_liquidity_pool_addresses()
+        );
+        println!("Dex Names :{:?}", t.get_dex_names());
     }
 }

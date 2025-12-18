@@ -254,6 +254,33 @@ mod tests {
     use std::sync::Arc;
 
     #[tokio::test]
+    async fn lisent_liquidity_last_transaction() {
+        let evm = Arc::new(Evm::new(EvmType::ETHEREUM_MAINNET).await.unwrap());
+        let trade = Trade::new(evm.clone());
+        let block_service = evm.clone().get_block_service();
+        loop {
+            match block_service.get_latest_block().await {
+                Ok(Some(block)) => {
+                    println!("Block hash: {:?}", block.transaction_hashes);
+                    for hash in block.transaction_hashes.unwrap() {
+                        let trade = trade
+                            .get_transactions_by_tx(&format!("{:?}", hash))
+                            .await
+                            .unwrap();
+                        println!("All transactions in the block: {:?}", trade);
+                    }
+                }
+                Ok(None) => println!("⚠️ Nont Block"),
+                Err(e) => println!("❌ Error: {}", e),
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                evm.clone().client.get_block_interval_time().unwrap(),
+            ))
+            .await;
+        }
+    }
+
+    #[tokio::test]
     async fn test_poll_latest_block_per_second() {
         let evm = Arc::new(Evm::new(EvmType::ETHEREUM_MAINNET).await.unwrap());
         let trade = Trade::new(evm.clone());
