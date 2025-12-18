@@ -261,13 +261,20 @@ mod tests {
         loop {
             match block_service.get_latest_block().await {
                 Ok(Some(block)) => {
-                    println!("Block hash: {:?}", block.transaction_hashes);
                     for hash in block.transaction_hashes.unwrap() {
                         let trade = trade
                             .get_transactions_by_tx(&format!("{:?}", hash))
                             .await
                             .unwrap();
-                        println!("All transactions in the block: {:?}", trade);
+                        println!("transaction hash: {:?}", trade.hash);
+                        println!("dex: {:?}", trade.get_dex_names());
+                        println!(
+                            "liquidity pool address: {:?}",
+                            trade.get_liquidity_pool_addresses()
+                        );
+                        println!("received: {:?}", trade.get_received_token_eth());
+                        println!("spent: {:?}", trade.get_spent_token_eth());
+                        println!("direction: {:?}", trade.getDirection());
                     }
                 }
                 Ok(None) => println!("⚠️ Nont Block"),

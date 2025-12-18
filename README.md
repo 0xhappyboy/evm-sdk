@@ -39,6 +39,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```
 
+## Listen for transaction information in the latest block.
+
+```rust
+#[cfg(test)]
+mod tests {
+    use crate::trade::{self, Trade};
+
+    use super::*;
+    use ethers::types::H256;
+    use evm_client::EvmType;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn lisent_liquidity_last_transaction() {
+        let evm = Arc::new(Evm::new(EvmType::ETHEREUM_MAINNET).await.unwrap());
+        let trade = Trade::new(evm.clone());
+        let block_service = evm.clone().get_block_service();
+        loop {
+            match block_service.get_latest_block().await {
+                Ok(Some(block)) => {
+                    for hash in block.transaction_hashes.unwrap() {
+                        let trade = trade
+                            .get_transactions_by_tx(&format!("{:?}", hash))
+                            .await
+                            .unwrap();
+                        println!("transaction hash: {:?}", trade.hash);
+                        println!("dex: {:?}", trade.get_dex_names());
+                        println!(
+                            "liquidity pool address: {:?}",
+                            trade.get_liquidity_pool_addresses()
+                        );
+                        println!("received: {:?}", trade.get_received_token_eth());
+                        println!("spent: {:?}", trade.get_spent_token_eth());
+                        println!("direction: {:?}", trade.getDirection());
+                    }
+                }
+                Ok(None) => println!("⚠️ Nont Block"),
+                Err(e) => println!("❌ Error: {}", e),
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                evm.clone().client.get_block_interval_time().unwrap(),
+            ))
+            .await;
+        }
+    }
+}
+```
+
 ## Scan all transactions in the latest block.
 
 ```rust
