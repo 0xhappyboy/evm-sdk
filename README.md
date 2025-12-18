@@ -39,6 +39,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```
 
+## Scan all transactions in the latest block.
+
+```rust
+#[cfg(test)]
+mod tests {
+    use crate::trade::{self, Trade};
+
+    use super::*;
+    use ethers::types::H256;
+    use evm_client::EvmType;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_poll_latest_block_per_second() {
+        let evm = Arc::new(Evm::new(EvmType::ETHEREUM_MAINNET).await.unwrap());
+        let trade = Trade::new(evm.clone());
+        let block_service = evm.clone().get_block_service();
+        for i in 0..5 {
+            match block_service.get_latest_block().await {
+                Ok(Some(block)) => {
+                    println!("✅ {} seconds: block #{:?}", i, block.number);
+                    println!("Block hash: {:?}", block.transaction_hashes);
+                    for hash in block.transaction_hashes.unwrap() {
+                        let trade = trade
+                            .get_transactions_by_tx(&format!("{:?}", hash))
+                            .await
+                            .unwrap();
+                        println!("All transactions in the block: {:?}", trade);
+                    }
+                }
+                Ok(None) => println!("⚠️  {} s: Nont Block", i),
+                Err(e) => println!("❌ {} s: Error: {}", i, e),
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                evm.clone().client.get_block_interval_time().unwrap(),
+            ))
+            .await;
+        }
+    }
+}
+```
+
 ## Get the actual number and amount of tokens decreased and increased in a specified transaction.
 
 ```rust

@@ -1162,7 +1162,7 @@ dependencies = [
 
 [[package]]
 name = "evm-sdk"
-version = "0.5.8"
+version = "0.5.9"
 dependencies = [
  "chrono",
  "csv",

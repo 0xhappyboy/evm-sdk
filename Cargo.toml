@@ -1,6 +1,6 @@
 [package]
 name = "evm-sdk"
-version = "0.5.8"
+version = "0.5.9"
 edition = "2024"
 authors = ["happyboy <superhappyboy1995@gmail.com>"]
 description = "Implement most of the commonly used practical transaction-related functions of the EVM network, all EVM traders will need this."
