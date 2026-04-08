@@ -242,7 +242,6 @@ impl ContractAnalyzer {
 
     /// Calculates approximate storage size based on non-zero bytes
     fn calculate_storage_size(&self, value: H256) -> usize {
-        // 简单的启发式方法：计算非零字节的数量
         value.as_bytes().iter().filter(|&&b| b != 0).count()
     }
 

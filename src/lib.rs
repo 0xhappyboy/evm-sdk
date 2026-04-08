@@ -8,6 +8,7 @@ pub mod safe;
 pub mod tool;
 pub mod trade;
 pub mod types;
+pub mod onchain;
 
 use std::sync::Arc;
 
