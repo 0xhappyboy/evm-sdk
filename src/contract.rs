@@ -278,6 +278,7 @@ impl ContractAnalyzer {
     ///
     /// # Example
     /// ```rust
+    /// let address: H160 = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".parse().map_err(|e| EvmError::RpcError(format!("Invalid transaction hash format: {}", e))).unwrap();
     /// let features = analyzer.analyze_bytecode_features(address).await?;
     /// println!("Is proxy: {}", features.is_proxy);
     /// println!("Has selfdestruct: {}", features.has_selfdestruct);
@@ -412,6 +413,14 @@ impl ContractAnalyzer {
     }
 }
 
+/// Characteristics and attributes of contract bytecode
+/// `address`: Contract address
+///`bytecode_length`: Bytecode length (number of bytes)
+///`function_selectors`: All extracted function selectors (4-byte identifiers)
+///`is_proxy`: Whether it is a proxy contract (checks if it contains `DELEGATECALL`)
+///`has_selfdestruct`: Whether it contains the `SELFDESTRUCT` opcode (self-destructible)
+///`has_delegatecall`: Whether it contains the `DELEGATECALL` opcode (can be delegated)
+///`opcode_distribution`: Distribution statistics of each opcode
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BytecodeFeatures {
     pub address: Address,
@@ -446,5 +455,25 @@ pub struct TransactionStats {
 impl From<ethers::providers::ProviderError> for EvmError {
     fn from(error: ethers::providers::ProviderError) -> Self {
         EvmError::RpcError(format!("Provider error: {}", error))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ethers::types::H160;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_analyze_bytecode_features() {
+        let evm = Evm::new(evm_client::EvmType::ETHEREUM_MAINNET)
+            .await
+            .unwrap();
+        let analyzer = ContractAnalyzer::new(Arc::new(evm));
+        let address: H160 = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+            .parse()
+            .map_err(|e| EvmError::RpcError(format!("Invalid transaction hash format: {}", e)))
+            .unwrap();
+        println!("{:?}", analyzer.analyze_bytecode_features(address).await);
     }
 }
